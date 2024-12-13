@@ -1,0 +1,262 @@
+---
+title: "Homework 3 Group C"
+author: "Billo, "
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# FSDS: Chapter 4
+
+## Exercise 4.24
+Refer to the vegetarian survey result in Exercise 4.6, with n = 25 and no vegetarians.
+(a) Find the Bayesian estimate of π using a beta prior distribution with α = β equal (i) 0.5,
+(ii) 1.0, (iii) 10.0. Explain how the choice of prior distribution affects the posterior mean
+estimate.
+(b) If you were planning how to take a larger survey from the same population, explain how
+you can use the posterior results of the previous survey with n = 25 based on the prior
+with α = β = 1 to form the prior distribution to use with the new survey results.
+
+### a
+```{r}
+# Insert your R code for Exercise 4.24 here
+bayesian_estimate = function(alpha, beta, n, x){
+  v = c(alpha + x, beta + n -x)
+  return(v)
+}
+alpha_beta = c(0.5, 1, 10)
+
+results = c()
+n = 25
+x = 0
+for (i in 1:length(alpha_beta)){
+  results = c(results, bayesian_estimate(alpha_beta[i], alpha_beta[i], n, x))
+}
+
+results
+```
+The posterior mean estimate is strongly affected by the choice of the prior distribution and its parameters: here we see that the mean estimate of the distribution $\pi$ changes according to its parameters, as there is no x from the posterior to influence it in this case. In this setting where the target group is non-sampled (there are 0 vegetarians), the variance of the distribution is very inflated by the $n$ parameter.
+
+```{r}
+y <- c(1, 4, 6, 12, 13, 14, 18, 19, 20, 22, 23, 24, 26, 31, 34,
+37, 46, 47, 56, 61, 63, 65, 70, 97, 385)
+n <- length(y); set.seed(1989);
+B <- 10^4
+boot.sample <- matrix(NA, nrow = B, ncol = n)
+boot.sample[1,] <- sample(y, n, replace = TRUE)
+boot.sample[2,] <- sample(y, n, replace = TRUE)
+boot.sample[1, ] # sample output
+# bootstrap mean estimates
+for(i in 1:B) {
+    boot.sample[i,] <- sample(y, n, replace = TRUE)
+}
+boot.stat <- rowMeans(boot.sample)
+hist(boot.stat, main="", breaks=20, prob=TRUE, col=gray(0.7),
+xlim=c(0, 200), ylim=c(0, 0.04))
+
+```
+
+###b
+We can use the posterior results from the previous survey as a prior: this will then be
+```{r}
+alpha = beta = 1
+posterior_mean = alpha/(alpha + beta + n)
+posterior_variance = ((alpha + x)*(beta + n -x))/((alpha + beta + n)^2 * (alpha + beta + n + 1))
+c(posterior_mean, posterior_variance)
+```
+So a prior distribution of $\pi(0.037037037, 0.001273761)$
+
+## Exercise 4.62
+For the bootstrap method, explain the similarity and difference between the true sampling
+distribution of $ \hat \theta $ and the empirically-generated bootstrap distribution in terms of its centerand its spread.
+
+The two sampling distributions become increasingly similar as $n \to \infty$, meaning that $ (\hat \theta - \theta) \to 0$. However its values vary around $\hat \theta$ instead of the true distribution parameter(s) $\theta$.
+```{r}
+y <- c(1, 4, 6, 12, 13, 14, 18, 19, 20, 22, 23, 24, 26, 31, 34,
+37, 46, 47, 56, 61, 63, 65, 70, 97, 385)
+n <- length(y); set.seed(1989);
+B <- 10^4
+boot.sample <- matrix(NA, nrow = B, ncol = n)
+boot.sample[1,] <- sample(y, n, replace = TRUE)
+boot.sample[2,] <- sample(y, n, replace = TRUE)
+boot.sample[1, ] # sample output
+
+# bootstrap mean estimates
+for(i in 1:B) {
+    boot.sample[i,] <- sample(y, n, replace = TRUE)
+}
+boot.stat <- rowMeans(boot.sample)
+hist(boot.stat, main="", breaks=20, prob=TRUE, col=gray(0.7),
+xlim=c(0, 200), ylim=c(0, 0.04))
+
+# actual mean estimates
+B <- 10^4;
+simu.sample <- matrix(NA, nrow = B, ncol = n)
+for(i in 1:B) simu.sample[i,] <- mean(30 * exp(rnorm(n)))
+simu.stat <- rowMeans(simu.sample)
+hist(simu.stat, main="", breaks=20, prob=TRUE, col=gray(0.7),
+xlim=c(0, 200), ylim=c(0, 0.04))
+c(mean(boot.sample), mean(simu.sample))
+```
+The two parameters are close but there still is a significant difference.
+
+# FSDS: Chapter 8
+
+## Exercise 8.4
+Refer to Exercise 8.1. Construct a classification tree, and prune strongly until the tree uses
+a single explanatory variable. Which crabs were predicted to have satellites? How does the
+proportion of correct predictions compare with the more complex tree in Figure 8.2?
+
+```{r}
+library(rpart)
+library(rpart.plot)
+crabs = read.table("https://stat4ds.rwth-aachen.de/data/Crabs.dat", header = TRUE)
+
+crabs.rpart <- rpart( y~weight + color, data = crabs, method = "class")
+crabs.rpart
+
+printcp(crabs.rpart)
+
+prune(crabs.rpart, cp =0)
+printcp(crabs.rpart)
+rpart.plot(crabs.rpart)
+
+```
+When pruned to just 1 variable, the model retains __weight__. Crabs that have a weight greater than 2.7 for sure have satellites
+```{r}
+sample <- sample(c(TRUE, FALSE), nrow(crabs), replace=TRUE, prob=c(0.8,0.2))
+train  <- crabs[sample, ]
+test   <- crabs[!sample, ]
+
+tree1 = rpart( y~weight, data = train, method = "class", cp = 0)
+tree2 = rpart( y~weight + color + width, data = train, method = "class")
+
+pred1 = predict(tree1, newdata = test, type = "class")
+pred2 = predict(tree2, newdata = test, type = "class")
+
+t1 = table(pred1, test$y)
+t2 = table(pred2, test$y)
+
+prec = function(table){
+  res = table[1]/(table[1] + table[2])
+}
+recall = function(table){
+  res = table[1]/(table[1] + table[3])
+}
+
+
+c(prec(t1), recall(t1), prec(t2), recall(t2))
+```
+Our results are mixed: the simpler model registers better precision but worse recall than the second one.
+
+# LAB: Modeling Phone Call Lengths
+
+## Task 1: Problem description
+Suppose you receive \(n = 15\) phone calls in a day, and you want to build a model to assess their average length. Your likelihood for each call length is \(y_i \sim \text{Exponential}(\lambda)\). Select an appropriate prior \(\pi(\lambda)\) and compute the posterior.
+
+1. \(\pi(\lambda) = \text{Beta}(4, 2)\)
+2. \(\pi(\lambda) = \text{Normal}(1, 2)\)
+3. \(\pi(\lambda) = \text{Gamma}(4, 2)\)
+
+*Provide a motivation for the choice of prior.*
+
+### Sub-task 2: Compute Posterior
+```{r}
+# Insert your R code to compute the posterior
+```
+
+### Results
+*Discuss the posterior distribution.*
+
+# ISLR: Chapter 6
+
+## Exercise 6.9 (a)-(d)
+
+### Task 1: Problem description
+*Provide a short description of the problem.*
+
+### Code
+```{r}
+# Insert your R code for Exercise 6.9 here
+```
+
+### Results
+*Discuss the results or observations from the code.*
+
+# ISLR: Chapter 7
+
+## Exercise 7.9
+
+### Task 1: Problem description
+*Provide a short description of the problem.*
+
+### Code
+```{r}
+# Insert your R code for Exercise 7.9 here
+```
+
+### Results
+*Discuss the results or observations from the code.*
+
+# GAM: Univariate Smoothing with mcycle Data
+
+### Task 1: Load and Inspect Data
+```{r}
+# Load data from the MASS package
+library(MASS)
+data(mcycle)
+head(mcycle)
+```
+
+### Task 2: Plot Data and Fit GAM Model
+```{r}
+# Use gam for univariate smoothing
+library(mgcv)
+fit_gam <- gam(accel ~ s(times, k = 30), data = mcycle, method = "GCV.Cp")
+plot(fit_gam, residuals = TRUE, pch = 1, rug = FALSE)
+```
+
+### Task 3: Fit Polynomial Model
+```{r}
+# Fit a polynomial model with lm
+fit_poly <- lm(accel ~ poly(times, degree = 4), data = mcycle)
+termplot(fit_poly, partial.resid = TRUE)
+```
+
+### Task 4: Compare with Un-penalized Thin Plate Regression Spline
+```{r}
+# Fit un-penalized thin plate regression spline
+fit_tprs <- gam(accel ~ s(times, bs = "tp", k = 30), data = mcycle, sp = 0)
+plot(fit_tprs, residuals = TRUE, pch = 1, rug = FALSE)
+```
+
+### Task 5: Compare with Un-penalized Cubic Regression Spline
+```{r}
+# Fit un-penalized cubic regression spline
+fit_crs <- gam(accel ~ s(times, bs = "cr", k = 30), data = mcycle, sp = 0)
+plot(fit_crs, residuals = TRUE, pch = 1, rug = FALSE)
+```
+
+### Task 6: Model Residuals
+```{r}
+# Plot residuals
+par(mfrow = c(2, 2))
+plot(fit_gam$residuals ~ mcycle$times, main = "GAM Residuals")
+plot(fit_poly$residuals ~ mcycle$times, main = "Polynomial Residuals")
+plot(fit_tprs$residuals ~ mcycle$times, main = "TPRS Residuals")
+plot(fit_crs$residuals ~ mcycle$times, main = "CRS Residuals")
+```
+
+### Task 7: Fit B-spline Model
+```{r}
+# Fit B-spline model
+library(splines)
+fit_bs <- lm(accel ~ bs(times, knots = c(10, 20, 30)), data = mcycle)
+termplot(fit_bs, partial.resid = TRUE)
+```
+
+### Results and Comparisons
+*Discuss the results of all models and compare their fits.*
