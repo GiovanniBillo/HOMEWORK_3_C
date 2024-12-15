@@ -189,17 +189,188 @@ Suppose you receive \(n = 15\) phone calls in a day, and you want to build a mod
 # ISLR: Chapter 7
 
 ## Exercise 7.9
-
-### Task 1: Problem description
-*Provide a short description of the problem.*
-
-### Code
+This question uses the variables dis (the weighted mean of distances
+to five Boston employment centers) and nox (nitrogen oxides concen-
+tration in parts per 10 million) from the Boston data. We will treat
+dis as the predictor and nox as the response.
+(a) Use the poly() function to fit a cubic polynomial regression to predict nox using dis. Report the regression output, and plot the resulting data and polynomial fits.
 ```{r}
-# Insert your R code for Exercise 7.9 here
+library(ggplot2)
+boston = read.csv("boston.csv")
+fitpoly = glm(NOX ~ poly(DIS, 2, raw = TRUE), data = boston)
+par(mfrow = c(1,2))
+plot(fitpoly,  which = c(1,2))
+
+ggplot(boston, aes(DIS, NOX)) + 
+  geom_point() + theme_bw() + 
+  stat_smooth(method = lm, formula = y ~ poly(x, 2, raw = TRUE), col = "red")
 ```
 
-### Results
-*Discuss the results or observations from the code.*
+(b) Plot the polynomial fits for a range of different polynomial degrees (say, from 1 to 10), and report the associated residual sum of squares.
+```{r}
+ggplot(boston, aes(DIS, NOX)) + 
+  geom_point() + theme_bw() + 
+  stat_smooth(method = lm, formula = y ~ poly(x, 2, raw = TRUE), col = "red")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 3, raw = TRUE), col = "green")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 4, raw = TRUE), col = "blue")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 5, raw = TRUE), col = "yellow")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 6, raw = TRUE), col = "purple")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 7, raw = TRUE), col = "black")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 8, raw = TRUE), col = "grey")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 9, raw = TRUE), col = "pink")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 10, raw = TRUE), col = "lightblue")
+
+# Fit polynomial models and compute RSS
+rss_data <- data.frame(Degree = 2:10, RSS = NA)
+
+for (degree in rss_data$Degree) {
+  model <- lm(NOX ~ poly(DIS, degree, raw = TRUE), data = boston)
+  residuals <- model$residuals
+  rss_data$RSS[rss_data$Degree == degree] <- sum(residuals^2)
+}
+
+# Plot RSS vs. Polynomial Degree
+ggplot(rss_data, aes(x = Degree, y = RSS)) +
+  geom_line(size = 1, color = "blue") +
+  geom_point(size = 2, color = "red") +
+  theme_bw() +
+  labs(
+    title = "Residual Sum of Squares (RSS) vs Polynomial Degree",
+    x = "Polynomial Degree",
+    y = "Residual Sum of Squares (RSS)"
+  )
+```
+
+Obviously, in such a setting, the more complicated model has the lowest error, but probably overfits the data. 
+Let's test it in a useful way with Cross Validation. 
+
+(c) Perform cross-validation or another approach to select the optimal degree for the polynomial, and explain your results.
+```{r}
+library(caret)
+library(dplyr)
+
+training_obs <- boston$NOX %>% createDataPartition(p = 0.8, list = FALSE)
+
+train <- boston[training_obs, ]
+test <- boston[-training_obs, ]
+
+metrics = data.frame(matrix(ncol = 3, nrow = 10))
+colnames(metrics) <- c('R2', 'RMSE', 'MAE')
+
+for (i in 1:10){
+  # Build the linear regression model on the training set
+  model <- lm(NOX ~ poly(DIS, i, raw = TRUE), data = train)
+
+  # Use the model to make predictions on the test set
+  predictions <- model %>% predict(test)
+
+  #Examine R-squared, RMSE, and MAE of predictions
+  metrics[i, "R2"] = (R2(predictions, test$NOX))
+  metrics[i, "RMSE"] = (RMSE(predictions, test$NOX))
+  metrics[i, "MAE"] = (MAE(predictions, test$NOX))
+
+
+           # RMSE = RMSE(predictions, test$NOX),
+           # MAE = MAE(predictions, test$NOX))
+}
+# select the best model(s)
+indexr2 = which.max(metrics[, "R2"])
+indexrmse = which.min(metrics[, "RMSE"])
+indexmae= which.min(metrics[, "MAE"])
+
+c(indexr2, indexrmse, indexmae)
+```
+
+The cubic polynomial fit seems to be the best one in this case.
+
+(d) Use the bs() function to fit a regression spline to predict nox using dis. Report the output for the fit using four degrees of freedom. How did you choose the knots? Plot the resulting fit.
+```{r}
+library(splines)
+knots = quantile(boston$DIS)[2:4]
+debugonce(bs)
+fit.spline <- lm(NOX ~ bs(DIS, df = 4), data = boston)
+summary(fit.spline)
+```
+The knots were chosen by the function itself:
+```{r}
+knots <- seq.int(from = 0, to = 1, length.out = nIknots + 
+        2L)[-c(1L, nIknots + 2L)]
+      quantile(x[!outside], knots)
+```
+
+```{r}
+
+ggplot(boston, aes(DIS, NOX)) + 
+  geom_point() + theme_bw() + 
+  stat_smooth(method = lm, formula = y ~ bs(x, df = 4), col = "red")
+
+```
+
+(e) Now fit a regression spline for a range of degrees of freedom, and plot the resulting fits and report the resulting RSS. Describe the results obtained.
+```{r}
+metrics_splines = data.frame(matrix(ncol = 3, nrow = 10))
+colnames(metrics_splines) <- c('R2', 'RMSE', 'MAE')
+
+for (i in 1:15){
+  # Build the linear regression model on the training set
+  model <- lm(NOX ~ bs(DIS, df = i), data = boston)
+
+  # Use the model to make predictions on the test set
+  predictions <- model %>% predict(boston)
+
+  #Examine R-squared, RMSE, and MAE of predictions
+  metrics_splines[i, "R2"] = (R2(predictions, boston$NOX))
+  metrics_splines[i, "RMSE"] = (RMSE(predictions, boston$NOX))
+  metrics_splines[i, "MAE"] = (MAE(predictions, boston$NOX))
+
+
+           # RMSE = RMSE(predictions, test$NOX),
+           # MAE = MAE(predictions, test$NOX))
+}
+
+# select the best model(s)
+indexr2 = which.max(metrics_splines[, "R2"])
+indexrmse = which.min(metrics_splines[, "RMSE"])
+indexmae= which.min(metrics_splines[, "MAE"])
+
+c(indexr2, indexrmse, indexmae)
+```
+The best model is between with 14 degrees of freedom
+
+(f) Perform cross-validation or another approach in order to select the best degrees of freedom for a regression spline on this data. Describe your results.
+```{r}
+metrics_splines_cr = data.frame(matrix(ncol = 3, nrow = 10))
+colnames(metrics_splines_cr) <- c('R2', 'RMSE', 'MAE')
+
+#define the number of subsets (or "folds") to use
+train_control <- trainControl(method = "cv", number = 5)
+
+for (i in 1:15){
+  # Build the linear regression model on the training set
+  model <- lm(NOX ~ bs(DIS, df = i), data = boston, trControl = train_control)
+
+  # Use the model to make predictions on the test set
+  predictions <- model %>% predict(boston)
+
+  #Examine R-squared, RMSE, and MAE of predictions
+  metrics_splines_cr[i, "R2"] = (R2(predictions, boston$NOX))
+  metrics_splines_cr[i, "RMSE"] = (RMSE(predictions, boston$NOX))
+  metrics_splines_cr[i, "MAE"] = (MAE(predictions, boston$NOX))
+
+
+           # RMSE = RMSE(predictions, test$NOX),
+           # MAE = MAE(predictions, test$NOX))
+}
+
+# select the best model(s)
+indexr2 = which.max(metrics_splines_cr[, "R2"])
+indexrmse = which.min(metrics_splines_cr[, "RMSE"])
+indexmae= which.min(metrics_splines_cr[, "MAE"])
+
+c(indexr2, indexrmse, indexmae)
+```
+
+The result is the same as without cross-validation
 
 # GAM: Univariate Smoothing with mcycle Data
 
