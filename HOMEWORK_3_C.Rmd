@@ -387,13 +387,21 @@ head(mcycle)
 # Use gam for univariate smoothing
 library(mgcv)
 fit_gam <- gam(accel ~ s(times, k = 30), data = mcycle, method = "GCV.Cp")
+ggplot(mcycle, aes(times, accel)) + 
+  geom_point() + theme_bw() + 
+  stat_smooth(method = gam, formula = y ~ s(x, k = 30), col = "red")
+```
+
+```{r}
 plot(fit_gam, residuals = TRUE, pch = 1, rug = FALSE)
+
 ```
 
 ### Task 3: Fit Polynomial Model
 ```{r}
 # Fit a polynomial model with lm
-fit_poly <- lm(accel ~ poly(times, degree = 4), data = mcycle)
+gam_df = 13.78
+fit_poly <- lm(accel ~ poly(times, degree = gam_df), data = mcycle)
 termplot(fit_poly, partial.resid = TRUE)
 ```
 
@@ -414,12 +422,38 @@ plot(fit_crs, residuals = TRUE, pch = 1, rug = FALSE)
 ### Task 6: Model Residuals
 ```{r}
 # Plot residuals
-par(mfrow = c(2, 2))
+par(mfrow = c(4, 4))
 plot(fit_gam$residuals ~ mcycle$times, main = "GAM Residuals")
 plot(fit_poly$residuals ~ mcycle$times, main = "Polynomial Residuals")
 plot(fit_tprs$residuals ~ mcycle$times, main = "TPRS Residuals")
 plot(fit_crs$residuals ~ mcycle$times, main = "CRS Residuals")
 ```
+```{r}
+library(gridExtra)
+library(ggplot2)
+
+# Create individual plots using ggplot
+plot1 <- ggplot(mcycle, aes(x = times, y = fit_gam$residuals)) +
+  geom_point() +
+  labs(title = "GAM Residuals", x = "Time", y = "Residuals")
+
+plot2 <- ggplot(mcycle, aes(x = times, y = fit_poly$residuals)) +
+  geom_point() +
+  labs(title = "Polynomial Residuals", x = "Time", y = "Residuals")
+
+plot3 <- ggplot(mcycle, aes(x = times, y = fit_tprs$residuals)) +
+  geom_point() +
+  labs(title = "TPRS Residuals", x = "Time", y = "Residuals")
+
+plot4 <- ggplot(mcycle, aes(x = times, y = fit_crs$residuals)) +
+  geom_point() +
+  labs(title = "CRS Residuals", x = "Time", y = "Residuals")
+
+# Arrange plots in a grid
+grid.arrange(plot1, plot2, plot3, plot4, nrow = 2, ncol = 2)
+
+```
+The residuals with TPRS and CRS are a little bit more sparse but there don't seem to be substantial improvements of one model over another.
 
 ### Task 7: Fit B-spline Model
 ```{r}
@@ -428,6 +462,11 @@ library(splines)
 fit_bs <- lm(accel ~ bs(times, knots = c(10, 20, 30)), data = mcycle)
 termplot(fit_bs, partial.resid = TRUE)
 ```
+```{r}
+plot5 <- ggplot(mcycle, aes(x = times, y = fit_bs$residuals)) +
+  geom_point() +
+  labs(title = "BS Residuals", x = "Time", y = "Residuals")
+plot5
 
-### Results and Comparisons
-*Discuss the results of all models and compare their fits.*
+```
+B-splines seem to leave some pattern in the data. The other models were an overall better fit. 
