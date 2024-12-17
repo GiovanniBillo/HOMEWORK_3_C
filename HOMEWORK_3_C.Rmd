@@ -161,11 +161,52 @@ Suppose you receive \(n = 15\) phone calls in a day, and you want to build a mod
 2. \(\pi(\lambda) = \text{Normal}(1, 2)\)
 3. \(\pi(\lambda) = \text{Gamma}(4, 2)\)
 
-*Provide a motivation for the choice of prior.*
+For such a situation, where the likelihood is a poisson, a Gamma prior is appropriate. Due to conjugacy, this entails that the posterior will also be Gamma.
+The prior is $\Gamma$(4, 2)
 
-### Sub-task 2: Compute Posterior
+$$
+\pi(\lambda) = \frac{\beta^{\alpha}}{\Gamma(\alpha)}\lambda^{\alpha -1}e^{- \beta \lambda }
+$$
+Which with our numbers becomes
+$$
+\pi(\lambda) = \frac{2^{4}}{\Gamma(4)}2^{4 -1}e^{-2 \lambda}
+$$
+During 
+Our likelihood is a Poisson with $n$ = 15
+
+$$
+L = \lambda^n e^{-\lambda \sum_{i = 1}^n y_i} 
+$$
+Which with our numbers becomes
+$$
+log(L) =  2^{15} e^{-2 \sum_{i = 1}^n y_i}
+$$
+Our posterioir is defined as
+$$
+\pi (\lambda | y) = \pi(\lambda)L(\lambda|y)
+$$
+which (ignoring the constant $\frac{2^{4}}{\Gamma(4)}$ with our quantities becomes 
+$$
+\pi (\lambda | y) = \lambda^{\alpha + n - 1} e^{\lambda (\beta + \sum y_i)}
+$$
+We can observe that our posterior is still a Gamma distribution with $\alpha' = \alpha + n$ and $\beta' = \beta + \sum y_i$
+Substituting these quantities with our numbers, we get:
+$$
+\pi (\lambda | y) = \lambda^{4 + 15 - 1} e^{\lambda (2 + \sum y_i)}
+$$
+We can now compute the actual quantities (!!! idk if this makes sense)
 ```{r}
-# Insert your R code to compute the posterior
+n = 15:
+alpha_prior = 4
+beta_prior = 2
+y = rpois(n, beta)
+alpha_posterior = alpha + n
+beta_posterior = 2 + sum(y)
+
+prior = ((beta^alpha)/dgamma(beta, shape = beta)) * beta^(alpha - 1) * exp(-beta*sum(y))
+L = 2^15 * exp(-2*sum(y))
+
+posterior = prior*L
 ```
 
 ### Results
