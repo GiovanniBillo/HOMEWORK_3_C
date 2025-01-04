@@ -1,0 +1,750 @@
+---
+title: "GroupC_HM3"
+author: "Trabucco, Suklan, Billo, Tavano"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+    toc: true
+    toc_depth: 3
+date: "2025-01-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## FSDS - Chapter 4 
+
+### Ex 4.24
+
+Refer to the vegetarian survey result in Exercise 4.6, with $n$ = 25 and no vegetarians.
+
+*(a) Find the Bayesian estimate of $\pi$ using a beta prior distribution with $\alpha$ = $\beta$ equal (i) 0.5, (ii) 1.0, (iii) 10.0. Explain how the choice of prior distribution affects the posterior mean estimate.*
+
+In order to solve this point, we compute the formula for the posterior distribution:
+
+$$ Beta(\alpha+x, \beta + n -x)  $$
+Thus, the posterior mean will be: $\frac{\alpha +x}{\alpha+\beta+n}$
+
+```{r}
+n <- 25
+x <- 0
+
+posterior_mean <- function(alpha, beta, x, n) {
+  (alpha + x) / (alpha + beta + n)
+}
+
+alpha_beta_values <- c(0.5, 1.0, 10.0)
+
+results <- sapply(alpha_beta_values, function(a) posterior_mean(a, a, x, n))
+names(results) <- paste0("alpha=beta=", alpha_beta_values)
+
+results
+```
+
+The posterior mean estimate is strongly affected by the choice of the prior distribution and its parameters: here we see that the mean estimate of the distribution $\pi$ changes according to its parameters, as there is no x from the posterior to influence it in this case. In this setting where the target group is non-sampled (there are 0 vegetarians).
+
+*(b) If you were planning how to take a larger survey from the same population, explain how you can use the posterior results of the previous survey with $n$ = 25 based on the prior with $\alpha$ = $\beta$ = 1 to form the prior distribution to use with the new survey results.*
+
+We can use the posterior results from the previous survey as a prior: 
+
+$$ Beta(\alpha_{post} = 1 + x,\  \beta_{post} = 1 + n-x ) = Beta(1,26) $$
+For the next survey, we can use this distribution as the new prior.
+
+If in the new survey we will get $x'$ vegetarians out of $n'$ observations, the new posterior distribution will be:
+
+$$ Beta(\alpha' = \alpha_{post}+x', \ \beta' = \beta_{post} + n' - x') $$
+Thus, the posterior mean of this distribution will be: $\frac{\alpha'}{\alpha'+\beta'}$
+
+### Ex 4.62
+
+For the bootstrap method, explain the similarity and difference between the true sampling distribution of $\hat \theta$ and the empirically-generated bootstrap distribution in terms of its center and its spread.
+
+**Solution**
+
+The bootstrap method is a resampling technique used to estimate the sampling distribution of a statistic, such as $\hat \theta$ by drawing repeated samples (with replacement) from the observed data. The true sampling distribution of $\hat \theta$ represents the variability of the statistics if we repeatedly sampled from the actual population, centering around the true parameter $\theta$, assuming that $\hat \theta$ is unbiased and with spread reflecting the true population's variability. On the other hand, the bootstrap distribution is constructed by resampling from the observed data, as stated before, centering around the observed sample estimate $\hat \theta$ rather than $\theta$ and approximating the spread of the true sampling distribution based on the variability within the sample. While the bootstrap distribution closely approximates the true distribution in large samples, difference can be noted in small samples or when the sample is not representative of the population, potentially leading to discrepancies in both centered and spread.
+
+
+```{r}
+par(mfrow = c(1, 2))
+y <- c(1, 4, 6, 12, 13, 14, 18, 19, 20, 22, 23, 24, 26, 31, 34,
+37, 46, 47, 56, 61, 63, 65, 70, 97, 385)
+n <- length(y); set.seed(1989);
+B <- 10^4
+boot.sample <- matrix(NA, nrow = B, ncol = n)
+boot.sample[1,] <- sample(y, n, replace = TRUE)
+boot.sample[2,] <- sample(y, n, replace = TRUE)
+boot.sample[1, ] # sample output
+
+# bootstrap mean estimates
+for(i in 1:B) {
+    boot.sample[i,] <- sample(y, n, replace = TRUE)
+}
+boot.stat <- rowMeans(boot.sample)
+hist(boot.stat, main="", breaks=20, prob=TRUE, col=gray(0.7),
+xlim=c(0, 200), ylim=c(0, 0.04))
+
+# actual mean estimates
+B <- 10^4;
+simu.sample <- matrix(NA, nrow = B, ncol = n)
+for(i in 1:B) simu.sample[i,] <- mean(30 * exp(rnorm(n)))
+simu.stat <- rowMeans(simu.sample)
+hist(simu.stat, main="", breaks=20, prob=TRUE, col=gray(0.7),
+xlim=c(0, 200), ylim=c(0, 0.04))
+c(mean(boot.sample), mean(simu.sample))
+```
+The two parameters are close but there still is a significant difference.
+
+## FSDS - Chapter 8
+
+### Ex 8.4
+
+Refer to Exercise 8.1. Construct a classification tree, and prune strongly until the tree uses a single explanatory variable. Which crabs were predicted to have satellites? How does the proportion of correct predictions compare with the more complex tree in Figure 8.2?
+
+**Solution**
+
+```{r}
+library(rpart)
+suppressWarnings(library(rpart.plot))
+crabs = read.table("https://stat4ds.rwth-aachen.de/data/Crabs.dat", header = TRUE)
+str(crabs)
+summary(crabs)
+```
+```{r}
+# using factor "Yes/no" as substitute of y.
+crabs$satellites <- as.factor(ifelse(crabs$sat > 0, "Yes", "No"))
+
+#building the regression tree
+set.seed(123) 
+crabs_tree <- rpart(satellites ~ weight+color, data = crabs, method = "class")
+crabs_tree
+```
+
+```{r}
+# using printcp function to detail CP, nsplit, rel error, xerror and xstd
+printcp(crabs_tree)
+rpart.plot(crabs_tree)
+```
+```{r}
+# pruning into a single variable (weight)
+tree_pruned <- prune(crabs_tree, cp =0.05)
+printcp(tree_pruned)
+rpart.plot(tree_pruned)
+```
+```{r}
+#making predictions
+predicted <- predict(tree_pruned, type = "class")
+comparison_table <- table(predicted, crabs$satellites)
+comparison_table
+
+acc = sum(diag(comparison_table))/sum(comparison_table)
+acc
+
+```
+
+## LAB
+
+### Ex LAB
+
+Suppose you receive $n$ = 15 phone calls in a day, and you want to build a model to assess their average length. Your likelihood for each call length is $y_i \sim Exponential(\lambda)$. Now, you have to choose the prior $\pi(\lambda)$. Please, tell which of these priors is adequate to describe the problem, and provide a short motivation for each of them:
+
+1. $\pi(\lambda)$ = Beta(4,2);
+2. $\pi(\lambda)$ = Normal(1,2);
+3. $\pi(\lambda)$ = Gamma(4,2);
+
+Now, compute your posterior as $\pi(\lambda|y) \propto L(\lambda;y)\pi(\lambda)$ for the selected prior. If your first choice was correct, you will be able to compute it analytically.
+
+**Solution**
+
+*Priors Evaluation:*
+
+1. $\pi(\lambda)$ = Beta(4,2):
+
+Beta distribution is common used for probabilities, with $p \in$ [0,1]. In this case the parameter of an exponential distribution $\lambda$ is not restricted in [0,1] but it can take any positive value. Thus, using a Beta prior for this problem is not appropriate.
+
+2. $\pi(\lambda)$ = Normal(1,2):
+
+Similarly with the previous point, Normal distribution can take both positive and negative values, which is not consistent with $\lambda$ adopted by the Exponential distribution. For this reason, Normal(1,2) distribution is not suitable.
+
+3. $\pi(\lambda)$ = Gamma(4,2):
+
+This is the most suitable prior because the Gamma distribution is defined on $\lambda$ > 0 and it is conjugate to the Exponential likelihood. Using a Gamma prior will allow us to compute the posterior analytically.
+
+*Posterior Computation with $\pi(\lambda)$ = Gamma(4,2)*
+
+First, let's compute the likelihood:
+
+$$ L(\lambda; y) = \prod_{i=1}^{n}{\lambda \ e^{-\lambda y_i}} = \lambda^n \ e^{-\lambda \ \sum_{i=1}^{n}{y_i}} $$
+Then, compute the Gamma prior with $\alpha$ = 4 and $\beta$ = 2:
+
+$$ \pi(\lambda) = \frac{\beta}{\Gamma(\alpha)} \ \lambda^{\alpha-1} \ e^{-\beta \lambda} $$
+
+Now, combine the terms to obtain the posterior distribution:
+
+$$ \pi(\lambda|y) \propto L(\lambda;y)\pi(\lambda) $$
+$$ \pi(\lambda|y) \propto  \lambda^n \ e^{-\lambda \ \sum_{i=1}^{n}{y_i}} \ \lambda^{\alpha-1} \ e^{-\beta \lambda}$$
+$$ \pi(\lambda|y) \propto \lambda^{n+\alpha-1} \ e^{-\lambda(\sum_{i=1}^n y_i+\beta)}$$
+Finally, identify the parameters $\alpha'$ and $\beta'$ of the posterior Gamma distribution:
+
+$$ \pi(\lambda|y) = Gamma(\alpha', \beta') $$
+With $\alpha' = n + \alpha = 15 +4 = 19$ and $\beta' = \sum_{i=1}^n y_i \ + \ \beta$.
+
+## ISLR - Chapter 6
+
+### Ex 6.9 
+
+In this exercise, we will predict the number of applications received using the other variables in the College data set.
+
+```{r}
+college_data <- read.csv("./college.csv", header = TRUE)
+summary(college_data)
+str(college_data)
+
+college_data$Private <- ifelse(college_data$Private == "Yes", 1, 0)
+```
+
+*(a) Split the data set into a training set and a test set.*
+
+```{r}
+set.seed(123)
+n_rows <- nrow(college_data)
+
+train_idx = sample(1:n_rows, size=0.7*n_rows)
+
+train_set <- college_data[train_idx, ]
+test_set <- college_data[-train_idx, ]
+
+n_rows
+dim(train_set)
+dim(test_set)
+```
+*(b) Fit a linear model using least squares on the training set, and report the test error obtained.*
+
+```{r}
+# Full Model
+full_model <- lm(Apps ~ ., data = train_set[, -1]) 
+summary(full_model)
+```
+
+```{r}
+# Prediction on test set
+test_predictions <- predict(full_model, newdata = test_set)
+
+# (Mean Squared Error)
+test_error <- mean((test_set$Apps - test_predictions)^2)
+
+# Output
+cat("Mean Squared Error on test set (full model):", test_error, "\n")
+```
+*(c) Fit a ridge regression model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.*
+
+```{r}
+train_x <- as.matrix(train_set[, -which(names(train_set) %in% c("Apps", "Unnamed: 0"))])
+train_y <- train_set$Apps
+test_x <- as.matrix(test_set[, -which(names(test_set) %in% c("Apps", "Unnamed: 0"))])
+test_y <- test_set$Apps
+```
+
+
+```{r}
+suppressPackageStartupMessages(suppressWarnings(library(glmnet)))
+
+# Ridge with cross validation
+set.seed(123)
+suppressWarnings({
+
+  cv_ridge <- cv.glmnet(train_x, train_y, alpha = 0)
+  best_lambda <- cv_ridge$lambda.min
+  cat("Best Lambda:", best_lambda, "\n")
+  
+  # Fit the final Ridge regression model using the optimal lambda
+  ridge_model <- glmnet(train_x, train_y, alpha = 0, lambda = best_lambda)
+
+  # Predict on the test set
+  ridge_predictions <- predict(ridge_model, s = best_lambda, newx = test_x)
+
+  # Calculate the test error (Mean Squared Error)
+  ridge_test_error <- mean((test_y - ridge_predictions)^2)
+  cat("Test Error (Ridge):", ridge_test_error, "\n")
+  
+})
+```
+
+*(d) Fit a lasso model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained, along with the number of non-zero coefficient estimates.*
+
+```{r}
+set.seed(123)
+
+# Fit the Lasso model using cross-validation
+suppressWarnings({
+  
+  cv_lasso <- cv.glmnet(train_x, train_y, alpha = 1)
+  best_lambda_lasso <- cv_lasso$lambda.min
+  cat("Best Lambda (Lasso):", best_lambda_lasso, "\n")
+
+  # Final Lasso model with optimal lambda
+  lasso_model <- glmnet(train_x, train_y, alpha = 1, lambda =  best_lambda_lasso)
+
+  # Predict on the test set
+  lasso_predictions <- predict(lasso_model, s = best_lambda_lasso, newx = test_x)
+
+  # Calculate test error (Mean Squared Error)
+  lasso_test_error <- mean((test_y - lasso_predictions)^2)
+  cat("Test Error (Lasso):", lasso_test_error, "\n")
+
+  # Count the number of non-zero coefficients
+  non_zero_coefficients <- sum(coef(lasso_model, s = best_lambda_lasso) != 0) - 1  # Exclude intercept
+  cat("Number of Non-Zero Coefficients (Lasso):", non_zero_coefficients, "\n")
+
+})
+
+```
+
+## ISLR - Chapter 7
+
+### Ex 7.9
+
+This question uses the variables dis (the weighted mean of distances to five Boston employment centers) and nox (nitrogen oxides concentration in parts per 10 million) from the Boston data. We will treat dis as the predictor and nox as the response.
+
+*(a) Use the poly() function to fit a cubic polynomial regression to predict nox using dis. Report the regression output, and plot the resulting data and polynomial fits.*
+
+```{r}
+library(ggplot2)
+boston = read.csv("boston.csv")
+fitpoly = glm(NOX ~ poly(DIS, 2, raw = TRUE), data = boston)
+par(mfrow = c(1,2))
+plot(fitpoly,  which = c(1,2))
+
+ggplot(boston, aes(DIS, NOX)) + 
+  geom_point() + theme_bw() + 
+  stat_smooth(method = lm, formula = y ~ poly(x, 2, raw = TRUE), col = "red")
+```
+
+*(b) Plot the polynomial fits for a range of different polynomial degrees (say, from 1 to 10), and report the associated residual sum of squares.*
+
+```{r}
+ggplot(boston, aes(DIS, NOX)) + 
+  geom_point() + theme_bw() + 
+  stat_smooth(method = lm, formula = y ~ poly(x, 1, raw = TRUE), col = "orange")+
+  stat_smooth(method = lm, formula = y ~ poly(x, 2, raw = TRUE), col = "red")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 3, raw = TRUE), col = "green")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 4, raw = TRUE), col = "blue")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 5, raw = TRUE), col = "yellow")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 6, raw = TRUE), col = "purple")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 7, raw = TRUE), col = "black")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 8, raw = TRUE), col = "grey")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 9, raw = TRUE), col = "pink")+ 
+  stat_smooth(method = lm, formula = y ~ poly(x, 10, raw = TRUE), col = "lightblue")
+
+# Fit polynomial models and compute RSS
+rss_data <- data.frame(Degree = 1:10, RSS = NA)
+
+for (degree in rss_data$Degree) {
+  model <- lm(NOX ~ poly(DIS, degree, raw = TRUE), data = boston)
+  residuals <- model$residuals
+  rss_data$RSS[rss_data$Degree == degree] <- sum(residuals^2)
+}
+
+# Plot RSS vs. Polynomial Degree
+suppressWarnings(
+  
+  ggplot(rss_data, aes(x = Degree, y = RSS)) +
+  geom_line(size = 1, color = "blue") +
+  geom_point(size = 2, color = "red") +
+  theme_bw() +
+  scale_x_continuous(breaks = 1:10) + 
+  labs(
+    title = "Residual Sum of Squares (RSS) vs Polynomial Degree",
+    x = "Polynomial Degree",
+    y = "Residual Sum of Squares (RSS)"
+  )
+  
+)
+
+```
+
+Obviously, in such a setting, the more complicated model has the lowest error, but probably overfits the data. 
+Let's test it in a useful way with Cross Validation. 
+
+*(c) Perform cross-validation or another approach to select the optimal degree for the polynomial, and explain your results.*
+
+```{r}
+suppressPackageStartupMessages(suppressWarnings({
+  library(caret)
+  library(lattice)
+  library(dplyr)
+}))
+```
+
+```{r}
+library(caret)
+library(dplyr)
+
+set.seed(000)
+training_obs <- boston$NOX %>% createDataPartition(p = 0.8, list = FALSE)
+
+train <- boston[training_obs, ]
+test <- boston[-training_obs, ]
+
+metrics = data.frame(matrix(ncol = 3, nrow = 10))
+colnames(metrics) <- c('R2', 'RMSE', 'MAE')
+
+for (i in 1:10){
+  # Build the linear regression model on the training set
+  model <- lm(NOX ~ poly(DIS, i, raw = TRUE), data = train)
+
+  # Use the model to make predictions on the test set
+  predictions <- model %>% predict(test)
+
+  #Examine R-squared, RMSE, and MAE of predictions
+  metrics[i, "R2"] = (R2(predictions, test$NOX))
+  metrics[i, "RMSE"] = (RMSE(predictions, test$NOX))
+  metrics[i, "MAE"] = (MAE(predictions, test$NOX))
+
+}
+# select the best model(s)
+indexr2 = which.max(metrics[, "R2"])
+indexrmse = which.min(metrics[, "RMSE"])
+indexmae= which.min(metrics[, "MAE"])
+
+c(indexr2, indexrmse, indexmae)
+```
+
+*(d) Use the bs() function to fit a regression spline to predict nox using dis. Report the output for the fit using four degrees of freedom. How did you choose the knots? Plot the resulting fit.*
+
+```{r}
+library(splines)
+
+# Fit a regression spline with 4 degrees of freedom
+spline_model <- lm(NOX ~ bs(DIS, df = 4), data = train)
+summary(spline_model)
+```
+```{r}
+# Generate predictions for plotting
+dis_values <- seq(min(train$DIS), max(train$DIS), length.out = 100)
+predictions <- predict(spline_model, newdata = data.frame(DIS = dis_values))
+
+# Plot the data and spline fit
+suppressWarnings(
+ggplot(data = train, aes(x = DIS, y = NOX)) +
+  geom_point(color = "darkgray", alpha = 0.7) +
+  geom_line(data = data.frame(DIS = dis_values, NOX = predictions),
+            aes(x = DIS, y = NOX), color = "blue", size = 1) +
+  labs(title = "Regression Spline Fit (4 Degrees of Freedom)",
+       x = "DIS", y = "NOX") +
+  theme_minimal())
+```
+
+*(e) Now fit a regression spline for a range of degrees of freedom, and plot the resulting fits and report the resulting RSS. Describe the results obtained.*
+
+```{r}
+par(mfrow = c(1,2))
+df_range <- 3:10
+
+rss_results <- data.frame(DegreesOfFreedom = df_range, RSS = numeric(length(df_range)))
+
+# Plot the fits
+plot(train$DIS, train$NOX, main = "Regression Splines\nwith Varying D.F.",
+     xlab = "DIS", ylab = "NOX", pch = 16, col = "blue")
+legend("topright", legend = paste("df =", df_range), col = 1:length(df_range), lty = 1, cex = 0.5)
+
+for (i in seq_along(df_range)) {
+  # Fit the regression spline with i degrees of freedom
+  spline_model <- lm(NOX ~ bs(DIS, df = df_range[i]), data = train)
+  
+  # Calculate RSS
+  rss_results$RSS[i] <- sum(residuals(spline_model)^2)
+  
+  # Generate predictions for plotting
+  dis_values <- seq(min(train$DIS), max(train$DIS), length.out = 100)
+  predictions <- predict(spline_model, newdata = data.frame(DIS = dis_values))
+  
+  # Add the fit to the plot
+  lines(dis_values, predictions, col = i, lwd = 2)
+}
+
+# Print the RSS results
+print(rss_results)
+
+
+# Plot RSS against degrees of freedom
+plot(rss_results$DegreesOfFreedom, rss_results$RSS, type = "b", pch = 16,
+     xlab = "Degrees of Freedom", ylab = "RSS", main = "RSS vs. Degrees of Freedom")
+
+```
+The first plot will show the fitted curves for each degree of freedom (df). As the degrees of freedom increase, the fit becomes more flexible, capturing more variations in the data. Overfitting may occur for very high degrees of freedom, where the spline fits the noise in the data rather than the underlying pattern. As the degrees of freedom increase, the RSS decreases because the model becomes more complex and better fits the training data. For lower degrees of freedom, the fit may be too smooth, failing to capture important variations in the data.
+
+*(f) Perform cross-validation or another approach in order to select the best degrees of freedom for a regression spline on this data. Describe your results.*
+
+
+## GAM
+
+### Ex GAM
+
+This question is about using gam for univariate smoothing, the advantages of penalized regression and weighting a smooth model fit. The mcycle data in the MASS package are a classic dataset in univariate smoothing, introduced in Silverman (1985). The data measure the acceleration of the rider’s head, against time, in a simulated motorcycle crash.
+
+```{r}
+suppressPackageStartupMessages({
+  suppressWarnings({
+    library(MASS)
+    library(mgcv)
+  })
+})
+
+```
+
+
+```{r}
+data("mcycle")
+head(mcycle)
+```
+
+*1. Plot the acceleration against time, and use gam to fit a univariate smooth to the data, selecting the smoothing parameter by GCV (k of 30 to 40 is plenty for this example). Plot the resulting smooth, with partial residuals, but without standard errors.*
+
+```{r}
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Acceleration vs Time", 
+     pch = 16, col = "blue")
+```
+
+```{r}
+gam_model <- gam(accel ~ s(times, k = 30), data = mcycle, method = "GCV.Cp")
+summary(gam_model)
+```
+
+```{r}
+par(mfrow = c(1, 2))
+
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Acceleration vs Time", 
+     pch = 16, col = "blue")
+
+lines(mcycle$times, predict(gam_model, newdata = mcycle), col = "red", lwd = 2)
+
+plot(gam_model, residuals = TRUE, se = FALSE, 
+     shade = FALSE, pch = 16, col = "blue", 
+     main = "GAM Fit with Partial Residuals")
+```
+
+*2. Use lm and poly to fit a polynomial to the data, with approximately the same degrees of freedom as was estimated by gam. Use termplot to plot the estimated polynomial and partial residuals. Note the substantially worse fit achieved by the polynomial, relative to the penalized regression spline fit.*
+
+```{r}
+gam_df <- summary(gam_model)$edf
+cat("Effective degrees of freedom used by GAM:", gam_df, "\n")
+
+# Fit a polynomial regression model with approximately the same df
+poly_degree <- round(gam_df)
+lm_model <- lm(accel ~ poly(times, degree = poly_degree), data = mcycle)
+```
+
+```{r}
+par(mfrow = c(1, 2))
+
+#1. Polynomiam fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Polynomial Fit vs Time", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(lm_model, newdata = mcycle), col = "red", lwd = 2)
+
+#2. Partial residuals using termplot
+termplot(lm_model, partial.resid = TRUE, se = FALSE, 
+         main = "Polynomial Fit with\nPartial Residuals", 
+         col.res = "blue", lwd.term = 2)
+```
+```{r}
+#comparison of R-squared:
+cat("GAM R-squared:", summary(gam_model)$r.sq, "\n")
+cat("Polynomial R-squared:", summary(lm_model)$r.squared, "\n")
+```
+
+*3. It’s possible to overstate the importance of penalization in explaining the improvement of the penalized regression spline, relative to the polynomial. Use gam to refit an un-penalized thin plate regression spline to the data, with basis dimension the same as that used for the polynomial, and again produce a plot for comparison with the previous two results.*
+
+```{r}
+basis_dim <- poly_degree
+
+#un-penalized thin plane regression spline using GAM
+unpenalized_gam_model <- gam(accel ~ s(times, k = basis_dim, fx = TRUE), 
+                             data = mcycle, method = "REML")
+
+par(mfrow = c(1, 3))
+
+# Plot 1: Penalized GAM fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Penalized GAM Fit", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(gam_model, newdata = mcycle), col = "red", lwd = 2)
+
+# Plot 2: Polynomial fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Polynomial Fit", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(lm_model, newdata = mcycle), col = "red", lwd = 2)
+
+# Plot 3: Un-penalized GAM fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Un-penalized GAM Fit", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(unpenalized_gam_model, newdata = mcycle), col = "red", lwd = 2)
+```
+```{r}
+# Compare model summaries
+cat("Penalized GAM R-squared:", summary(gam_model)$r.sq, "\n")
+cat("Polynomial R-squared:", summary(lm_model)$r.squared, "\n")
+cat("Un-penalized GAM R-squared:", summary(unpenalized_gam_model)$r.sq, "\n")
+```
+
+*4. Redo part 3 using an un-penalized cubic regression spline. You should find a fairly clear ordering of the acceptability of the results for the four models tried - what is it?*
+
+```{r}
+unpenalized_cubic_model <- gam(accel ~ s(times, bs = "cr", k = basis_dim, fx = TRUE), 
+                               data = mcycle, method = "REML")
+
+par(mfrow = c(2, 2))
+
+# Plot 1: Penalized GAM fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Penalized GAM Fit", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(gam_model, newdata = mcycle), col = "red", lwd = 2)
+
+# Plot 2: Polynomial fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Polynomial Fit", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(lm_model, newdata = mcycle), col = "red", lwd = 2)
+
+# Plot 3: Un-penalized thin plate spline
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Un-penalized Thin Plate", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(unpenalized_gam_model, newdata = mcycle), col = "red", lwd = 2)
+
+# Plot 4: Un-penalized cubic regression spline
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Un-penalized Cubic Spline", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(unpenalized_cubic_model, newdata = mcycle), col = "red", lwd = 2)
+```
+```{r}
+# Compare model summaries
+cat("Penalized GAM R-squared:", summary(gam_model)$r.sq, "\n")
+cat("Polynomial R-squared:", summary(lm_model)$r.squared, "\n")
+cat("Un-penalized Thin Plate R-squared:", summary(unpenalized_gam_model)$r.sq, "\n")
+cat("Un-penalized Cubic Spline R-squared:", summary(unpenalized_cubic_model)$r.sq, "\n")
+```
+*5. Now plot the model residuals against time, and comment.*
+
+```{r}
+#getting the residuals for each model
+residuals_penalized_gam <- residuals(gam_model)
+residuals_polynomial <- residuals(lm_model)
+residuals_unpenalized_thin_plate <- residuals(unpenalized_gam_model)
+residuals_unpenalized_cubic <- residuals(unpenalized_cubic_model)
+```
+
+```{r}
+par(mfrow = c(2, 2))
+
+# Plot 1: Residuals of penalized GAM
+plot(mcycle$times, residuals_penalized_gam, 
+     xlab = "Time (ms)", ylab = "Residuals", 
+     main = "Residuals: Penalized GAM", 
+     pch = 16, col = "blue")
+abline(h = 0, col = "red", lwd = 2)
+
+# Plot 2: Residuals of polynomial fit
+plot(mcycle$times, residuals_polynomial, 
+     xlab = "Time (ms)", ylab = "Residuals", 
+     main = "Residuals: Polynomial Fit", 
+     pch = 16, col = "blue")
+abline(h = 0, col = "red", lwd = 2)
+
+# Plot 3: Residuals of un-penalized thin plate spline
+plot(mcycle$times, residuals_unpenalized_thin_plate, 
+     xlab = "Time (ms)", ylab = "Residuals", 
+     main = "Residuals: Un-penalized Thin Plate", 
+     pch = 16, col = "blue")
+abline(h = 0, col = "red", lwd = 2)
+
+# Plot 4: Residuals of un-penalized cubic regression spline
+plot(mcycle$times, residuals_unpenalized_cubic, 
+     xlab = "Time (ms)", ylab = "Residuals", 
+     main = "Residuals: Un-penalized\nCubic Spline", 
+     pch = 16, col = "blue")
+abline(h = 0, col = "red", lwd = 2)
+```
+*Comments on residuals:*
+
+The residuals from the penalized GAM are relatively small and evenly distributed around zero, with no significant patterns, indicating a good fit to the data. In contrast, the polynomial fit shows clear residual patterns, especially at the boundaries, which suggests underfitting or over-smoothing in these areas and highlights its inability to capture the complexity of the data effectively.
+
+The un-penalized thin plate spline produces smaller residuals, but oscillatory patterns may emerge, pointing to overfitting in certain regions due to the absence of penalization. Similarly, the un-penalized cubic regression spline has residuals that are more regular than those from the thin plate spline but still exhibit more variability than the penalized GAM, indicating slight overfitting caused by the lack of penalization.
+
+*6. Fit a linear model including a b-spline using the function bs on times and select a suitable degree and the knots position. Compare this model with the previous ones and comment.*
+
+```{r}
+#Fit B-spline model
+library(splines)
+
+degree <- 3  
+knots <- quantile(mcycle$times, probs = c(0.25, 0.5, 0.75)) 
+b_spline_model <- lm(accel ~ bs(times, degree = degree, knots = knots), data = mcycle)
+b_spline_predictions <- predict(b_spline_model, newdata = mcycle)
+```
+
+```{r}
+#Comparison with prevoious models
+par(mfrow = c(2, 2))
+
+# Plot 1: Penalized GAM fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Penalized GAM Fit", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(gam_model, newdata = mcycle), col = "red", lwd = 2)
+
+# Plot 2: Polynomial fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "Polynomial Fit", 
+     pch = 16, col = "blue")
+lines(mcycle$times, predict(lm_model, newdata = mcycle), col = "red", lwd = 2)
+
+# Plot 3: B-spline fit
+plot(mcycle$times, mcycle$accel, 
+     xlab = "Time (ms)", ylab = "Acceleration (g)", 
+     main = "B-spline Fit", 
+     pch = 16, col = "blue")
+lines(mcycle$times, b_spline_predictions, col = "red", lwd = 2)
+
+# Plot 4: Residuals of B-spline
+plot(mcycle$times, residuals(b_spline_model), 
+     xlab = "Time (ms)", ylab = "Residuals", 
+     main = "Residuals: B-spline", 
+     pch = 16, col = "blue")
+abline(h = 0, col = "red", lwd = 2)
+```
+
+```{r}
+# Print model summaries for comparison
+cat("Penalized GAM R-squared:", summary(gam_model)$r.sq, "\n")
+cat("Polynomial R-squared:", summary(lm_model)$r.squared, "\n")
+cat("Un-penalized Thin Plate R-squared:", summary(unpenalized_gam_model)$r.sq, "\n")
+cat("Un-penalized Cubic Spline R-squared:", summary(unpenalized_cubic_model)$r.sq, "\n")
+cat("B-spline R-squared:", summary(b_spline_model)$r.squared, "\n")
+```
+*Comments on comparison:*
+
+The penalized GAM remains the best model in terms of smoothness, flexibility, and generalization. Its residuals are small and evenly distributed, and it achieves the highest $R^2$.
+The B-spline model provides a good alternative, particularly if the degree and knot positions are well-chosen. However, it lacks the flexibility of penalized splines and can overfit or underfit if knots are not optimally placed.
+The polynomial fit and un-penalized splines perform worse, with the polynomial fit showing boundary issues and un-penalized splines tending to overfit.
+The B-spline strikes a balance between polynomial rigidity and spline overfitting, but it is not as robust as the penalized GAM.
